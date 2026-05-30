@@ -137,13 +137,14 @@ void mic_mclk_init(PIO pio, uint32_t sm, uint32_t pin, float fs_Hz)
   // ...
   pio_sm_init(pio, sm, offset, &sm_config);
   pio_sm_set_enabled(pio, sm, true);
-
-  xprintf("[mic] MCLK on GPIO%u, target %u Hz\r\n", pin, (uint32_t)mclk_hz);
 }
 
 // ----------------------------------------------------------------------------
 void mic_i2s_init(PIO pio, uint32_t sm, uint32_t base_pin, float fs_Hz)
 {
+  // MCLK must be running before the ES7210 will ACK on I2C
+  mic_mclk_init(pio, sm + 1, base_pin + 3, fs_Hz);
+
   // ...
   mic_i2s_pio_init(pio, sm, base_pin, fs_Hz);
   mic_i2s_dmain_init(pio, sm);

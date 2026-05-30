@@ -7,7 +7,7 @@
 #include "pico/stdlib.h"
 
 // ----------------------------------------------------------------------------
-#define i2c_DELAY() sleep_nop(50)
+#define i2c_DELAY() sleep_nop(10)
 
 // ----------------------------------------------------------------------------
 const uint8_t i2c_sclPin = 5;
@@ -17,28 +17,28 @@ const uint8_t i2c_sdaPin = 6;
 static void i2c_CLOCK_HI()
 {
   // Set SCL pin as input
-  sio_hw->gpio_oe_clr |= (1ul << i2c_sclPin);
+  sio_hw->gpio_oe_clr = (1ul << i2c_sclPin);
 }
 
 // ----------------------------------------------------------------------------
 static void i2c_DATA_HI()
 {
   // Set SDA pin as input
-  sio_hw->gpio_oe_clr |= (1ul << i2c_sdaPin);
+  sio_hw->gpio_oe_clr = (1ul << i2c_sdaPin);
 }
 
 // ----------------------------------------------------------------------------
 static void i2c_CLOCK_LO()
 {
   // Set SCL pin as output
-  sio_hw->gpio_oe_set |= (1ul << i2c_sclPin);
+  sio_hw->gpio_oe_set = (1ul << i2c_sclPin);
 }
 
 // ----------------------------------------------------------------------------
 static void i2c_DATA_LO()
 {
   // Set SDA pin as output
-  sio_hw->gpio_oe_set |= (1ul << i2c_sdaPin);
+  sio_hw->gpio_oe_set = (1ul << i2c_sdaPin);
 }
 
 // ----------------------------------------------------------------------------

@@ -49,7 +49,7 @@ static void i2c_scan()
   xprintf("[i2c] scanning ...\r\n");
 
   uint32_t found = 0;
-  for(uint8_t addr=0x08;addr<=0x77;addr++)
+  for(uint8_t addr=0x00;addr<=0x7F;addr++)
   {
     i2c_start();
     const uint8_t nack = i2c_write(write_address(addr));
@@ -205,9 +205,6 @@ int main()
   hardware_init();
 
   // ...
-  i2c_scan();
-
-  // ...
   while(1)
   {
     ui_task();
@@ -222,7 +219,7 @@ int main()
 static void hardware_init()
 {
   // ...
-  set_sys_clock_khz(150000, true);
+  set_sys_clock_khz(144000, true);
 
   // PIO-based UART TX for console output
   uart_tx_init(pio1, 0, 10, 1000000);
@@ -242,17 +239,10 @@ static void hardware_init()
       fs_Hz  // Sampling frequency in Hertz
   );
 
-  // ...
+  // Speaker enable
   gpio_init(29);
   gpio_set_dir(29, GPIO_OUT);
   gpio_put(29, true);
-
-  // ...
-  i2c_init();
-
-  // MCLK must be running before the ES7210 will ACK on I2C
-  mic_mclk_init(pio1, 2, 4, fs_Hz);
-  sleep_ms(1000);
 
   // ...
   mic_i2s_init(
@@ -261,4 +251,8 @@ static void hardware_init()
           1, // base pin: SDOUT=1, LRCK=2, BCLK=3
       fs_Hz  // Sampling frequency in Hertz
   );
+
+  // ...
+  i2c_init();
+  i2c_scan();
 }
