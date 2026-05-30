@@ -10,8 +10,8 @@
 #define i2c_DELAY() sleep_nop(50)
 
 // ----------------------------------------------------------------------------
-const uint8_t i2c_sdaPin = 0;
-const uint8_t i2c_sclPin = 1;
+const uint8_t i2c_sclPin = 5;
+const uint8_t i2c_sdaPin = 6;
 
   // ----------------------------------------------------------------------------
 static void i2c_CLOCK_HI()

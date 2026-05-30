@@ -44,6 +44,28 @@ static inline uint32_t spkFifoAvailable()
 static void hardware_init();
 
 // ----------------------------------------------------------------------------
+static void i2c_scan()
+{
+  xprintf("[i2c] scanning ...\r\n");
+
+  uint32_t found = 0;
+  for(uint8_t addr=0x08;addr<=0x77;addr++)
+  {
+    i2c_start();
+    const uint8_t nack = i2c_write(write_address(addr));
+    i2c_stop();
+
+    if(nack == ACK)
+    {
+      xprintf("[i2c] device @ 0x%02X\r\n", addr);
+      found++;
+    }
+  }
+
+  xprintf("[i2c] %u device(s) found\r\n", found);
+}
+
+// ----------------------------------------------------------------------------
 static void ui_task()
 {
   static uint8_t init_flag = false;
@@ -73,6 +95,37 @@ static void ui_task()
     gpio_put(22, (led_state & 0x01) == 0);
     led_state = (led_state + 1) % 4;
   }
+}
+
+// ----------------------------------------------------------------------------
+volatile uint32_t micRxCount = 0;
+volatile int32_t micPeakL = 0;
+volatile int32_t micPeakR = 0;
+
+// ----------------------------------------------------------------------------
+void __not_in_flash_func(mic_i2s_process)(uint32_t* rx)
+{
+  gpio_put(20, true);
+
+  int32_t peakL = 0;
+  int32_t peakR = 0;
+  for(int32_t i=0;i<FRAMES_PER_BUFFER;i+=2)
+  {
+    const int32_t l = (int32_t)rx[i + 0];
+    const int32_t r = (int32_t)rx[i + 1];
+
+    const int32_t al = ((l < 0) ? -l : l);
+    const int32_t ar = ((r < 0) ? -r : r);
+
+    if(al > peakL) { peakL = al; }
+    if(ar > peakR) { peakR = ar; }
+  }
+
+  micPeakL = peakL;
+  micPeakR = peakR;
+  micRxCount++;
+
+  gpio_put(20, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -152,6 +205,9 @@ int main()
   hardware_init();
 
   // ...
+  i2c_scan();
+
+  // ...
   while(1)
   {
     ui_task();
@@ -190,4 +246,19 @@ static void hardware_init()
   gpio_init(29);
   gpio_set_dir(29, GPIO_OUT);
   gpio_put(29, true);
+
+  // ...
+  i2c_init();
+
+  // MCLK must be running before the ES7210 will ACK on I2C
+  mic_mclk_init(pio1, 2, 4, fs_Hz);
+  sleep_ms(1000);
+
+  // ...
+  mic_i2s_init(
+       pio1, // PIO ID
+          1, // State machine ID
+          1, // base pin: SDOUT=1, LRCK=2, BCLK=3
+      fs_Hz  // Sampling frequency in Hertz
+  );
 }

@@ -34,6 +34,11 @@ pico_generate_pio_header(${PROJECT_NAME}
 
 # ...
 pico_generate_pio_header(${PROJECT_NAME}
+  ../src/mic/mic_i2s.pio OUTPUT_DIR src/mic
+)
+
+# ...
+pico_generate_pio_header(${PROJECT_NAME}
   ../src/util/uart_tx.pio OUTPUT_DIR src/util
 )
 
@@ -41,6 +46,7 @@ pico_generate_pio_header(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE
   src
   src/dac
+  src/mic
   src/com
   src/util
   src/usb
@@ -59,6 +65,9 @@ target_sources(${PROJECT_NAME} PRIVATE
 
   # ...
   src/dac/dac_i2s.c
+
+  # ...
+  src/mic/mic_i2s.c
 )
 
 # ...

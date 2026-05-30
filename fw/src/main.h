@@ -14,6 +14,8 @@
 #include "pico/util/queue.h"
 #include "sound.h"
 #include "dac_i2s.h"
+#include "mic_i2s.h"
 #include "uart_tx.h"
 #include "pico/multicore.h"
 #include "pico/mutex.h"
+#include "i2c.h"
