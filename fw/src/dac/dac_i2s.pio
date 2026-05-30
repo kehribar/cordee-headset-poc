@@ -1,0 +1,43 @@
+; -----------------------------------------------------------------------------
+; Bidirectional I2S transfer
+; -----------------------------------------------------------------------------
+.program dac_i2s
+
+  ; ...........................................................................
+  ; side #0   ---> BCLK
+  ; side #1   ---> LRCK
+  ; output #0 ---> DOUT
+  ; input #0  ---> DIN
+  ; ...........................................................................
+
+.side_set 2
+
+.wrap_target
+
+  ; ...
+  set x, 30         side 0b11
+
+left_:
+
+  ; ...
+  out pins, 1   [1] side 0b10
+  in  pins, 1       side 0b11
+  jmp x-- left_     side 0b11
+
+  ; ...
+  out pins, 1   [1] side 0b00
+  in  pins, 1       side 0b01
+  set x, 30         side 0b01
+
+right_:
+
+  ; ...
+  out pins, 1   [1] side 0b00
+  in  pins, 1       side 0b01
+  jmp x-- right_    side 0b01
+
+  ; ...
+  out pins, 1   [1] side 0b10
+  in  pins, 1       side 0b11
+
+.wrap
