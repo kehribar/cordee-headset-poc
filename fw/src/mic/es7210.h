@@ -7,7 +7,12 @@
 
 // ----------------------------------------------------------------------------
 #include <stdint.h>
-#include <stdbool.h>
+
+// ----------------------------------------------------------------------------
+// All functions return 0 on success, -1 on failure (I2C NACK or bad args).
+// ----------------------------------------------------------------------------
+#define ES7210_OK   (0)
+#define ES7210_FAIL (-1)
 
 // ----------------------------------------------------------------------------
 // I2C 7-bit address. Datasheet pattern: 1000 0 AD1 AD0.
@@ -65,46 +70,45 @@ typedef enum
 } es7210_bias_t;
 
 // ----------------------------------------------------------------------------
-// Probe codec via I2C (returns true if device ACKs at ES7210_I2C_ADDR).
+// Probe codec via I2C (returns 0 if device ACKs at ES7210_I2C_ADDR).
 // ----------------------------------------------------------------------------
-bool es7210_probe();
+int32_t es7210_probe();
 
 // ----------------------------------------------------------------------------
 // Read CHIP ID registers (0x3D, 0x3E). Expected: id1=0x72, id0=0x10.
 // ----------------------------------------------------------------------------
-bool es7210_readChipId(uint8_t* id1, uint8_t* id0);
+int32_t es7210_readChipId(uint8_t* id1, uint8_t* id0);
 
 // ----------------------------------------------------------------------------
-// One-shot raw register access. Returns true on ACK.
+// One-shot raw register access.
 // ----------------------------------------------------------------------------
-bool es7210_writeReg(uint8_t reg, uint8_t val);
-bool es7210_readReg(uint8_t reg, uint8_t* val);
+int32_t es7210_writeReg(uint8_t reg, uint8_t val);
+int32_t es7210_readReg(uint8_t reg, uint8_t* val);
 
 // ----------------------------------------------------------------------------
 // Default init for I2S slave, 32-bit, single-speed, 48 kHz, MCLK=256*Fs.
 // Powers up MIC1+MIC2 -> ADC1/ADC2 (left/right of standard 2-ch I2S frame).
 // MIC3/MIC4 stay powered down. PGA gain defaults to 0 dB on all enabled mics.
 // Must be called AFTER MCLK is running on the codec MCLK pin.
-// Returns true if all I2C writes ACK'd.
 // ----------------------------------------------------------------------------
-bool es7210_init();
+int32_t es7210_init();
 
 // ----------------------------------------------------------------------------
 // Runtime analog (PGA) gain per microphone.
 // ----------------------------------------------------------------------------
-bool es7210_setMicGain(es7210_mic_t mic, es7210_gain_t gain);
+int32_t es7210_setMicGain(es7210_mic_t mic, es7210_gain_t gain);
 
 // ----------------------------------------------------------------------------
 // Runtime microphone bias voltage per mic-pair (MIC1/2 share, MIC3/4 share).
 // pairIndex: 0 -> MIC1/2 (reg 0x41), 1 -> MIC3/4 (reg 0x42).
 // ----------------------------------------------------------------------------
-bool es7210_setMicBias(uint8_t pairIndex, es7210_bias_t bias);
+int32_t es7210_setMicBias(uint8_t pairIndex, es7210_bias_t bias);
 
 // ----------------------------------------------------------------------------
 // Mute / unmute a single mic input by clearing/setting SELMICn (reg 0x43..0x46
-// bit 4). PGA gain code is preserved.
+// bit 4). PGA gain code is preserved. muted: 0 -> unmuted, !=0 -> muted.
 // ----------------------------------------------------------------------------
-bool es7210_muteMic(es7210_mic_t mic, bool muted);
+int32_t es7210_muteMic(es7210_mic_t mic, uint8_t muted);
 
 // ----------------------------------------------------------------------------
 #endif
