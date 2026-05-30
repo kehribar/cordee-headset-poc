@@ -26,8 +26,9 @@ static void mic_i2s_pio_init(
   const uint32_t lrck_pin = base_pin + 1;
   const uint32_t bclk_pin = base_pin + 2;
 
-  // ...
-  const float clkdiv = (float)clock_get_hz(clk_sys) / (fs_Hz * 64 * 8);
+  // 4 PIO cycles per BCLK period; TDM I2S uses BCLK = 128*Fs
+  // -> PIO clock = 512 * Fs (was 256 * Fs in 2-ch I2S mode)
+  const float clkdiv = (float)clock_get_hz(clk_sys) / (fs_Hz * 128 * 4);
 
   {
     // ...
@@ -51,7 +52,7 @@ static void mic_i2s_pio_init(
     sm_config_set_in_pins(&sm_config, sdout_pin);
     sm_config_set_sideset_pins(&sm_config, lrck_pin);
     sm_config_set_in_shift(&sm_config, false, true, 32);
-    sm_config_set_clkdiv(&sm_config, clkdiv * 2);
+    sm_config_set_clkdiv(&sm_config, clkdiv);
 
     // ...
     pio_sm_init(pio, sm, offset, &sm_config);

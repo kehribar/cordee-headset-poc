@@ -170,8 +170,8 @@ int32_t es7210_init()
   rc |= es7210_writeReg(ES7210_REG_ADC_OSR, 0x20);
 
   // Mode: SCLK normal, EQ off, single-speed (Fs<=48kHz), I2S slave.
-  // LRCK_RATE_MODE only matters in multi-LRCK TDM, leave at 1.
-  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x14);
+  // LRCK_RATE_MODE = 2 (4 channels, used by some TDM variants).
+  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x24);
 
   // Initialization timing
   rc |= es7210_writeReg(ES7210_REG_TIME_CTRL0, 0x30);
@@ -186,8 +186,9 @@ int32_t es7210_init()
   // SDP: 32-bit word length (SP_WL=100), I2S protocol (SP_PROTOCAL=00)
   rc |= es7210_writeReg(ES7210_REG_SDP_CFG1, 0x80);
 
-  // SDP: ADC12 -> SDOUT1, ADC34 -> SDOUT2 (SDOUT_MODE=00)
-  rc |= es7210_writeReg(ES7210_REG_SDP_CFG2, 0x00);
+  // SDP: TDM I2S on SDOUT1 (SDOUT_MODE=10).
+  // Frame: ch1, ch3 during LRCK=H, ch2, ch4 during LRCK=L (Figure 2e).
+  rc |= es7210_writeReg(ES7210_REG_SDP_CFG2, 0x02);
 
   // ALC disabled, plain PGA gain mode
   rc |= es7210_writeReg(ES7210_REG_ALC_SEL, 0x00);
@@ -201,25 +202,38 @@ int32_t es7210_init()
   // Analog: PDN_ANA off (bit7=0), VX2OFF=1 for VDDA=3.3V (bit6=1)
   rc |= es7210_writeReg(ES7210_REG_ANALOG, 0x43);
 
-  // Mic bias: 2.87V on both pairs (LVL_MICBIAS=111)
+  // Mic bias: 2.87V on MIC3/4 pair (only MIC4 used). MIC1/2 pair off.
   rc |= es7210_writeReg(ES7210_REG_MIC12_BIAS, 0x70);
   rc |= es7210_writeReg(ES7210_REG_MIC34_BIAS, 0x70);
 
-  // Select MIC1/MIC2 inputs with 0 dB PGA gain. MIC3/MIC4 deselected.
-  rc |= es7210_writeReg(ES7210_REG_MIC1_GAIN, ES7210_GAIN_SELMIC | ES7210_GAIN_0DB);
-  rc |= es7210_writeReg(ES7210_REG_MIC2_GAIN, ES7210_GAIN_SELMIC | ES7210_GAIN_0DB);
+  // Only MIC4 selected at 0 dB; MIC1/2/3 deselected.
+  rc |= es7210_writeReg(ES7210_REG_MIC1_GAIN, 0x00);
+  rc |= es7210_writeReg(ES7210_REG_MIC2_GAIN, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC3_GAIN, 0x00);
-  rc |= es7210_writeReg(ES7210_REG_MIC4_GAIN, 0x00);
+  rc |= es7210_writeReg(ES7210_REG_MIC4_GAIN, ES7210_GAIN_SELMIC | ES7210_GAIN_33DB);
 
-  // Low-power bits off on MIC1/2; MIC3/4 unused
+  // Low-power bits off on all mics
   rc |= es7210_writeReg(ES7210_REG_MIC1_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC2_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC3_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC4_LP, 0x00);
 
-  // Power up: MIC1/2 fully on (all bits = 0). MIC3/4 left powered down.
-  rc |= es7210_writeReg(ES7210_REG_MIC12_PDN, 0x00);
-  rc |= es7210_writeReg(ES7210_REG_MIC34_PDN, 0xFF);
+  // Power down ADC1/ADC2 entirely; MIC1/2 pair off.
+  rc |= es7210_writeReg(ES7210_REG_MIC12_PDN, 0xFF);
+
+  // ADC34 pair: ref-gen + MICBIAS34 + ADC4 + PGA4 ON; ADC3/PGA3 OFF.
+  // bits: PDN_ADC34VREFGEN=0, PDN_MICBIAS34=0, PDN_PGA4=0, PDN_PGA3=1,
+  //       PDN_MOD4=0, PDN_MOD3=1, MODTOP4_RST=0, MODTOP3_RST=1  -> 0x15
+  rc |= es7210_writeReg(ES7210_REG_MIC34_PDN, 0x15);
+
+  // Release all digital resets and turn the chip state machine ON.
+  // Without this, ADC modulators stay off and SDOUT1 outputs digital zero.
+  // bits: RST_MSTGEN=0, RST_ADC34_DIG=0, RST_ADC12_DIG=0, SEQ_DIS=0,
+  //       RST_REGS=0, RST_DIG=0, CSM_ON=1  -> 0x01
+  rc |= es7210_writeReg(ES7210_REG_RESET, 0x01);
+
+  // Give the auto power-up sequence time to walk through chip-initial -> normal
+  sleep_ms(50);
 
   // Probe chip ID for sanity
   uint8_t id1 = 0;

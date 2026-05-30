@@ -98,40 +98,14 @@ static void ui_task()
 }
 
 // ----------------------------------------------------------------------------
-volatile uint32_t micRxCount = 0;
-volatile int32_t micPeakL = 0;
-volatile int32_t micPeakR = 0;
-
-// ----------------------------------------------------------------------------
 void __not_in_flash_func(mic_i2s_process)(uint32_t* rx)
 {
-  gpio_put(20, true);
 
-  int32_t peakL = 0;
-  int32_t peakR = 0;
-  for(int32_t i=0;i<FRAMES_PER_BUFFER;i+=2)
-  {
-    const int32_t l = (int32_t)rx[i + 0];
-    const int32_t r = (int32_t)rx[i + 1];
-
-    const int32_t al = ((l < 0) ? -l : l);
-    const int32_t ar = ((r < 0) ? -r : r);
-
-    if(al > peakL) { peakL = al; }
-    if(ar > peakR) { peakR = ar; }
-  }
-
-  micPeakL = peakL;
-  micPeakR = peakR;
-  micRxCount++;
-
-  gpio_put(20, false);
 }
 
 // ----------------------------------------------------------------------------
 void __not_in_flash_func(dac_i2s_process)(uint32_t* rx, uint32_t* tx)
 {
-  gpio_put(19, true);
   bool silence = false;
   static bool isWorking = false;
   const uint32_t level = spkFifoLevel();
@@ -170,32 +144,6 @@ void __not_in_flash_func(dac_i2s_process)(uint32_t* rx, uint32_t* tx)
     }
     spkDataTail = tail;
   }
-  gpio_put(19, false);
-}
-
-// ----------------------------------------------------------------------------
-void splash_task()
-{
-  static int32_t idx = 0;
-  static bool playing = true;
-  static uint32_t delayStart_ms = 0;
-
-  if(playing)
-  {
-    while(spkFifoIsFull() == false)
-    {
-      spkData[spkDataHead++] = sound[idx];
-      spkDataHead &= (SPK_DATA_LEN - 1);
-      idx += 1;
-      if(idx == (int32_t)(sizeof(sound) / 2))
-      {
-        idx = 0;
-        playing = false;
-        delayStart_ms = readCounter1ms();
-        break;
-      }
-    }
-  }
 }
 
 // ----------------------------------------------------------------------------
@@ -208,7 +156,6 @@ int main()
   while(1)
   {
     ui_task();
-    splash_task();
   }
 
   // ...
@@ -258,4 +205,5 @@ static void hardware_init()
 
   // ...
   es7210_init();
+  es7210_setMicGain(ES7210_MIC4, ES7210_GAIN_37P5DB);
 }
