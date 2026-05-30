@@ -11,36 +11,6 @@ uint32_t blink_interval_ms = 1000;
 #define FS (48000)
 
 // ----------------------------------------------------------------------------
-#define SPK_DATA_LEN (2048)
-static uint32_t spkData[SPK_DATA_LEN];
-volatile uint32_t spkDataHead = 0;
-volatile uint32_t spkDataTail = 0;
-
-// ----------------------------------------------------------------------------
-static inline bool spkFifoIsFull()
-{
-  return ((spkDataHead + 1) & (SPK_DATA_LEN - 1)) == spkDataTail;
-}
-
-// ----------------------------------------------------------------------------
-static inline bool spkFifoIsEmpty()
-{
-  return spkDataHead == spkDataTail;
-}
-
-// ----------------------------------------------------------------------------
-static inline uint32_t spkFifoLevel()
-{
-  return (spkDataHead - spkDataTail) & (SPK_DATA_LEN - 1);
-}
-
-// ----------------------------------------------------------------------------
-static inline uint32_t spkFifoAvailable()
-{
-  return (SPK_DATA_LEN - 1) - spkFifoLevel();
-}
-
-// ----------------------------------------------------------------------------
 static void hardware_init();
 
 // ----------------------------------------------------------------------------
@@ -98,28 +68,45 @@ static void ui_task()
 }
 
 // ----------------------------------------------------------------------------
+// Mic I2S DMA delivered FRAMES_PER_BUFFER MIC4 samples (32-bit left-justified,
+// MSB-first). Each PIO transfer captures one channel-4 sample. Forward the
+// block to USB unchanged — TinyUSB sends the upper 24 bits on the wire.
+// ----------------------------------------------------------------------------
+static int32_t s_micPkt[FRAMES_PER_BUFFER];
+
 void __not_in_flash_func(mic_i2s_process)(uint32_t* rx)
 {
-
+  for(int32_t i = 0; i < FRAMES_PER_BUFFER; i++)
+  {
+    s_micPkt[i] = (int32_t)rx[i];
+  }
+  usb_audio_write_mic(s_micPkt, FRAMES_PER_BUFFER);
 }
 
 // ----------------------------------------------------------------------------
+// DAC I2S needs FRAMES_PER_BUFFER 32-bit words (L+R interleaved, two words
+// per stereo frame). Pull 16-bit mono samples from the USB speaker FIFO,
+// duplicate to both channels, left-justify into the 32-bit I2S slot.
+// ----------------------------------------------------------------------------
 void __not_in_flash_func(dac_i2s_process)(uint32_t* rx, uint32_t* tx)
 {
-  bool silence = false;
+  (void)rx;
+
   static bool isWorking = false;
-  const uint32_t level = spkFifoLevel();
+  bool silence = false;
+
+  const uint32_t level = usb_audio_spkFifoLevel();
   if(isWorking)
   {
-    if(level < FRAMES_PER_BUFFER)
+    if(level < (uint32_t)(FRAMES_PER_BUFFER / 2))
     {
       silence = true;
     }
   }
   else
   {
-    // Wait for initial 10ms data
-    if(level < (int32_t)(FS * 0.010))
+    // Wait for ~10 ms of audio to buffer before starting playback.
+    if(level < (uint32_t)(FS * 0.010))
     {
       silence = true;
     }
@@ -129,20 +116,18 @@ void __not_in_flash_func(dac_i2s_process)(uint32_t* rx, uint32_t* tx)
   {
     isWorking = false;
     memset(tx, 0, (FRAMES_PER_BUFFER * sizeof(uint32_t)));
+    return;
   }
-  else
-  {
-    isWorking = true;
-    int32_t tail = spkDataTail;
-    for(int32_t i=0;i<FRAMES_PER_BUFFER;i+=2)
-    {
-      int32_t data = spkData[tail++];
-      tail &= (SPK_DATA_LEN - 1);
 
-      tx[i + 0] = ((int32_t)data << 16);
-      tx[i + 1] = ((int32_t)data << 16);
-    }
-    spkDataTail = tail;
+  isWorking = true;
+  int16_t pcm[FRAMES_PER_BUFFER / 2];
+  usb_audio_read_spk(pcm, FRAMES_PER_BUFFER / 2);
+
+  for(int32_t i = 0, j = 0; i < FRAMES_PER_BUFFER; i += 2, j++)
+  {
+    const uint32_t w = ((uint32_t)pcm[j]) << 16;
+    tx[i + 0] = w;
+    tx[i + 1] = w;
   }
 }
 
@@ -155,6 +140,7 @@ int main()
   // ...
   while(1)
   {
+    tud_task();
     ui_task();
   }
 
@@ -205,5 +191,16 @@ static void hardware_init()
 
   // ...
   es7210_init();
-  es7210_setMicGain(ES7210_MIC4, ES7210_GAIN_37P5DB);
+  es7210_setMicGain(ES7210_MIC4, (es7210_gain_t)14);
+
+  // Verify the gain register reads back what we intended.
+  {
+    extern int32_t es7210_readReg(uint8_t reg, uint8_t* val);
+    uint8_t mic4_gain_post = 0;
+    es7210_readReg(0x46, &mic4_gain_post);
+    xprintf("[es7210] post-setMicGain MIC4_GAIN=%02X (expect 1E)\r\n", mic4_gain_post);
+  }
+
+  // ...
+  tud_init(BOARD_TUD_RHPORT);
 }

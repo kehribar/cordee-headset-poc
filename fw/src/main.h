@@ -20,3 +20,5 @@
 #include "pico/multicore.h"
 #include "pico/mutex.h"
 #include "i2c.h"
+#include "tusb.h"
+#include "usb_audio.h"

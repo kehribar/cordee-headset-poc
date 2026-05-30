@@ -13,30 +13,42 @@
 // ------- //
 
 #define mic_i2s_wrap_target 0
-#define mic_i2s_wrap 11
+#define mic_i2s_wrap 23
 #define mic_i2s_pio_version 1
 
 static const uint16_t mic_i2s_program_instructions[] = {
             //     .wrap_target
     0xf83e, //  0: set    x, 30           side 3     
     0xa942, //  1: nop                    side 1 [1] 
-    0x5801, //  2: in     pins, 1         side 3     
+    0xb842, //  2: nop                    side 3     
     0x1841, //  3: jmp    x--, 1          side 3     
-    0xa142, //  4: nop                    side 0 [1] 
-    0x5001, //  5: in     pins, 1         side 2     
-    0xf03e, //  6: set    x, 30           side 2     
-    0xa142, //  7: nop                    side 0 [1] 
-    0x5001, //  8: in     pins, 1         side 2     
-    0x1047, //  9: jmp    x--, 7          side 2     
-    0xa942, // 10: nop                    side 1 [1] 
-    0x5801, // 11: in     pins, 1         side 3     
+    0xa942, //  4: nop                    side 1 [1] 
+    0xb842, //  5: nop                    side 3     
+    0xf83e, //  6: set    x, 30           side 3     
+    0xa942, //  7: nop                    side 1 [1] 
+    0xb842, //  8: nop                    side 3     
+    0x1847, //  9: jmp    x--, 7          side 3     
+    0xa142, // 10: nop                    side 0 [1] 
+    0xb042, // 11: nop                    side 2     
+    0xf03e, // 12: set    x, 30           side 2     
+    0xa142, // 13: nop                    side 0 [1] 
+    0xb042, // 14: nop                    side 2     
+    0x104d, // 15: jmp    x--, 13         side 2     
+    0xa142, // 16: nop                    side 0 [1] 
+    0xb042, // 17: nop                    side 2     
+    0xf03e, // 18: set    x, 30           side 2     
+    0xa142, // 19: nop                    side 0 [1] 
+    0x5001, // 20: in     pins, 1         side 2     
+    0x1053, // 21: jmp    x--, 19         side 2     
+    0xa942, // 22: nop                    side 1 [1] 
+    0x5801, // 23: in     pins, 1         side 3     
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program mic_i2s_program = {
     .instructions = mic_i2s_program_instructions,
-    .length = 12,
+    .length = 24,
     .origin = -1,
     .pio_version = mic_i2s_pio_version,
 #if PICO_PIO_VERSION > 0

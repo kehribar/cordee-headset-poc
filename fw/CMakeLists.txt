@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 # ...
-set(PROJECT_NAME usb_inout)
+set(PROJECT_NAME cordee-heatset)
 set(PICO_BOARD pico2)
 set(PICO_PLATFORM rp2350)
 
@@ -69,6 +69,10 @@ target_sources(${PROJECT_NAME} PRIVATE
   # ...
   src/mic/mic_i2s.c
   src/mic/es7210.c
+
+  # ...
+  src/usb/usb_audio.c
+  src/usb/usb_descriptors.c
 )
 
 # ...
@@ -79,7 +83,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   hardware_dma
   hardware_irq
   hardware_pwm
+  tinyusb_device
+  pico_unique_id
 )
+
+# Make sure pico_stdlib doesn't also try to claim USB or the hardware UART —
+# we drive the console over PIO UART and USB is owned by tinyusb_device.
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 # ...
 pico_add_extra_outputs(${PROJECT_NAME})

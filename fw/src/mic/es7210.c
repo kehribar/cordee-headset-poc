@@ -193,11 +193,11 @@ int32_t es7210_init()
   // ALC disabled, plain PGA gain mode
   rc |= es7210_writeReg(ES7210_REG_ALC_SEL, 0x00);
 
-  // HPF defaults (DC blocker on, slow setting)
+  // HPF defaults (DC blocker on, slow setting). ADC34 mirrors ADC12.
   rc |= es7210_writeReg(ES7210_REG_ADC12_HPF1, 0x06);
   rc |= es7210_writeReg(ES7210_REG_ADC12_HPF2, 0x26);
-  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF1, 0x26);
-  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF2, 0x06);
+  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF1, 0x06);
+  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF2, 0x26);
 
   // Analog: PDN_ANA off (bit7=0), VX2OFF=1 for VDDA=3.3V (bit6=1)
   rc |= es7210_writeReg(ES7210_REG_ANALOG, 0x43);
@@ -252,6 +252,24 @@ int32_t es7210_init()
   {
     return ES7210_FAIL;
   }
+
+  // Read back the critical registers so we can verify the writes took.
+  uint8_t mic4_gain = 0;
+  uint8_t mic34_pdn = 0;
+  uint8_t mic34_bias = 0;
+  uint8_t analog = 0;
+  uint8_t sdp_cfg1 = 0;
+  uint8_t sdp_cfg2 = 0;
+  es7210_readReg(ES7210_REG_MIC4_GAIN, &mic4_gain);
+  es7210_readReg(ES7210_REG_MIC34_PDN, &mic34_pdn);
+  es7210_readReg(ES7210_REG_MIC34_BIAS, &mic34_bias);
+  es7210_readReg(ES7210_REG_ANALOG, &analog);
+  es7210_readReg(ES7210_REG_SDP_CFG1, &sdp_cfg1);
+  es7210_readReg(ES7210_REG_SDP_CFG2, &sdp_cfg2);
+  xprintf("[es7210] MIC4_GAIN=%02X MIC34_PDN=%02X MIC34_BIAS=%02X\r\n",
+    mic4_gain, mic34_pdn, mic34_bias);
+  xprintf("[es7210] ANALOG=%02X SDP_CFG1=%02X SDP_CFG2=%02X\r\n",
+    analog, sdp_cfg1, sdp_cfg2);
 
   return ES7210_OK;
 }

@@ -18,18 +18,18 @@
 
 static const uint16_t dac_i2s_program_instructions[] = {
             //     .wrap_target
-    0xf83e, //  0: set    x, 30           side 3
-    0x7101, //  1: out    pins, 1         side 2 [1]
-    0x5801, //  2: in     pins, 1         side 3
-    0x1841, //  3: jmp    x--, 1          side 3
-    0x6101, //  4: out    pins, 1         side 0 [1]
-    0x4801, //  5: in     pins, 1         side 1
-    0xe83e, //  6: set    x, 30           side 1
-    0x6101, //  7: out    pins, 1         side 0 [1]
-    0x4801, //  8: in     pins, 1         side 1
-    0x0847, //  9: jmp    x--, 7          side 1
-    0x7101, // 10: out    pins, 1         side 2 [1]
-    0x5801, // 11: in     pins, 1         side 3
+    0xf83e, //  0: set    x, 30           side 3     
+    0x7101, //  1: out    pins, 1         side 2 [1] 
+    0x5801, //  2: in     pins, 1         side 3     
+    0x1841, //  3: jmp    x--, 1          side 3     
+    0x6101, //  4: out    pins, 1         side 0 [1] 
+    0x4801, //  5: in     pins, 1         side 1     
+    0xe83e, //  6: set    x, 30           side 1     
+    0x6101, //  7: out    pins, 1         side 0 [1] 
+    0x4801, //  8: in     pins, 1         side 1     
+    0x0847, //  9: jmp    x--, 7          side 1     
+    0x7101, // 10: out    pins, 1         side 2 [1] 
+    0x5801, // 11: in     pins, 1         side 3     
             //     .wrap
 };
 
