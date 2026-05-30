@@ -255,4 +255,7 @@ static void hardware_init()
   // ...
   i2c_init();
   i2c_scan();
+
+  // ...
+  es7210_init();
 }

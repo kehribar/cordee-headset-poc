@@ -68,6 +68,7 @@ target_sources(${PROJECT_NAME} PRIVATE
 
   # ...
   src/mic/mic_i2s.c
+  src/mic/es7210.c
 )
 
 # ...

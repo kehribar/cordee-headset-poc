@@ -15,6 +15,7 @@
 #include "sound.h"
 #include "dac_i2s.h"
 #include "mic_i2s.h"
+#include "es7210.h"
 #include "uart_tx.h"
 #include "pico/multicore.h"
 #include "pico/mutex.h"
