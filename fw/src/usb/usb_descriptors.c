@@ -130,10 +130,15 @@ uint8_t const desc_configuration[] = {
 
   TUD_AUDIO_DESC_TYPE_I_FORMAT(AUDIO_SPK_BYTES, AUDIO_SPK_BITS),
 
+  // Speaker sink = ADAPTIVE (not ASYNC). An async OUT endpoint requires an
+  // isochronous feedback IN endpoint per UAC2 3.16.2.2; Windows' usbaudio2.sys
+  // enforces this and refuses to start the whole audio function without it
+  // ("Device not started"). Adaptive sinks need no feedback EP, so Windows
+  // starts and Linux is unaffected (no feedback EP to confuse its clock probe).
   TUD_AUDIO_DESC_STD_AS_ISO_EP(
     EPNUM_AUDIO_SPK,
     (uint8_t)((uint8_t)TUSB_XFER_ISOCHRONOUS |
-              (uint8_t)TUSB_ISO_EP_ATT_ASYNCHRONOUS |
+              (uint8_t)TUSB_ISO_EP_ATT_ADAPTIVE |
               (uint8_t)TUSB_ISO_EP_ATT_DATA),
     AUDIO_EP_SPK_SZ,
     0x01
