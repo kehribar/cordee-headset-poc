@@ -171,8 +171,15 @@ int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain)
   rc |= es7210_writeReg(ES7210_REG_ADC34_HPF2, 0x0A);
   rc |= es7210_writeReg(ES7210_REG_ADC34_HPF1, 0x2A);
 
-  // MODE_CFG: bit 0 = master/slave. 0 = slave (we feed BCLK/LRCK).
-  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x00);
+  // MODE_CFG: bit0 = master/slave (0 = slave, we feed BCLK/LRCK).
+  // bits[7:4] = LRCK_RATE_MODE. THIS REGISTER WAS THE TDM-DECODE BUG: with
+  // 0x00 the chip emitted a 16-slot / 512-BCLK (4-chip cascade) TDM frame, so
+  // our 4-slot / 128-BCLK frame only lined up with ch4 in 2 of every 16 LRCK
+  // periods -> a continuous-but-7/8-zero-stuffed capture whose FFT was the
+  // "Fs/16 comb". 0x10 is the Espressif es7210 driver value and makes the chip
+  // emit a normal 4-slot TDM frame that matches the PIO; ch4 then arrives every
+  // frame (nz=1.0, comb gone). See src/mic/notes.md "TDM DECODE FINDING".
+  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x10);
 
   // Analog block: PDN_ANA off, VDDA = 3.3 V, VMID 5 kOhm start.
   rc |= es7210_writeReg(ES7210_REG_ANALOG, 0x43);
@@ -197,7 +204,7 @@ int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain)
   // so LJ aligns the chip's data with our slot capture timing.
   rc |= es7210_writeReg(ES7210_REG_SDP_CFG1, 0x81);
 
-  // SDP: TDM I2S on SDOUT1 (4 channels in one LRCK period).
+  // SDP: SDOUT_MODE = 10 = TDM I2S/LJ (Espressif's working TDM value).
   rc |= es7210_writeReg(ES7210_REG_SDP_CFG2, 0x02);
 
   // ALC disabled.
@@ -244,6 +251,15 @@ int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain)
   rc |= es7210_writeReg(ES7210_REG_MIC2_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC3_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC4_LP, 0x00);
+
+  // Final digital-engine reset to LATCH the serial/TDM config. Espressif's
+  // es7210_start() ends with reg0x00 0x71 -> 0x41, i.e. it resets the ADC +
+  // digital engine AFTER all clock/format/TDM-mode writes, then releases into
+  // normal operation. Our previous init only reset at the very start (before
+  // those writes), so the serial engine may run on a stale config. (EXP1 for
+  // the 2/16 dropout.)
+  rc |= es7210_writeReg(ES7210_REG_RESET, 0x71);
+  rc |= es7210_writeReg(ES7210_REG_RESET, 0x41);
 
   // Give the auto power-up sequence time to walk to normal state.
   sleep_ms(50);
