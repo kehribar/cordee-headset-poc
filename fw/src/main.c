@@ -92,34 +92,22 @@ void __not_in_flash_func(dac_i2s_process)(uint32_t* rx, uint32_t* tx)
 {
   (void)rx;
 
+  // Startup pre-roll only: wait until ~10 ms of audio has buffered before the
+  // first playback so initial USB jitter doesn't immediately underrun. Once
+  // started we stay started -- usb_audio_read_spk() zero-fills any momentary
+  // shortfall, which is gentler than re-priming the whole buffer (that caused
+  // a ~10 ms dropout on every underrun under the unsynced/adaptive clock).
   static bool isWorking = false;
-  bool silence = false;
-
-  const uint32_t level = usb_audio_spkFifoLevel();
-  if(isWorking)
+  if(isWorking == false)
   {
-    if(level < (uint32_t)(FRAMES_PER_BUFFER / 2))
+    if(usb_audio_spkFifoLevel() < (uint32_t)(FS * 0.010))
     {
-      silence = true;
+      memset(tx, 0, (FRAMES_PER_BUFFER * sizeof(uint32_t)));
+      return;
     }
-  }
-  else
-  {
-    // Wait for ~10 ms of audio to buffer before starting playback.
-    if(level < (uint32_t)(FS * 0.010))
-    {
-      silence = true;
-    }
+    isWorking = true;
   }
 
-  if(silence)
-  {
-    isWorking = false;
-    memset(tx, 0, (FRAMES_PER_BUFFER * sizeof(uint32_t)));
-    return;
-  }
-
-  isWorking = true;
   int16_t pcm[FRAMES_PER_BUFFER / 2];
   usb_audio_read_spk(pcm, FRAMES_PER_BUFFER / 2);
 
