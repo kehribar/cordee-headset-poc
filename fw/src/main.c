@@ -189,17 +189,9 @@ static void hardware_init()
   i2c_init();
   i2c_scan();
 
-  // ...
-  es7210_init();
-  es7210_setMicGain(ES7210_MIC4, (es7210_gain_t)14);
-
-  // Verify the gain register reads back what we intended.
-  {
-    extern int32_t es7210_readReg(uint8_t reg, uint8_t* val);
-    uint8_t mic4_gain_post = 0;
-    es7210_readReg(0x46, &mic4_gain_post);
-    xprintf("[es7210] post-setMicGain MIC4_GAIN=%02X (expect 1E)\r\n", mic4_gain_post);
-  }
+  // Only MIC4 is populated. Moderate analog gain (33 dB) — high enough for
+  // good SNR without saturating on loud sources.
+  es7210_initSel(0x08, ES7210_GAIN_33DB);
 
   // ...
   tud_init(BOARD_TUD_RHPORT);

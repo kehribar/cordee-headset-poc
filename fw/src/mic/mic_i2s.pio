@@ -1,81 +1,37 @@
-; -----------------------------------------------------------------------------
-; RX-only TDM I2S (master): generate BCLK + LRCK for 4-channel TDM I2S,
-; sample only the MIC4 (channel 4) slot. The other three slots are skipped.
-;
-; Frame layout (SDOUT_MODE=10 on ES7210):
-;   LRCK=H half : ch1 (32 bits, skip), ch3 (32 bits, skip)
-;   LRCK=L half : ch2 (32 bits, skip), ch4 (32 bits, CAPTURE -> ISR -> FIFO)
-;
-; BCLK = 128 * Fs, LRCK = Fs, 4 PIO cycles per BCLK period.
-; -----------------------------------------------------------------------------
 .program mic_i2s
-
-  ; ...........................................................................
-  ; side #0  ---> LRCK
-  ; side #1  ---> BCLK
-  ; input #0 ---> SDOUT1
-  ; ...........................................................................
-
 .side_set 2
-
 .wrap_target
-
-  ; --- ch1 (LRCK=H, skip 32 bits) ---
   set x, 30         side 0b11
-
 ch1_:
   nop           [1] side 0b01
-  nop               side 0b11
+  nop              side 0b11
   jmp x-- ch1_      side 0b11
-
   nop           [1] side 0b01
-  nop               side 0b11
+  nop              side 0b11
   set x, 30         side 0b11
-
-  ; --- ch3 (LRCK=H, skip 32 bits) ---
 ch3_:
   nop           [1] side 0b01
-  nop               side 0b11
+  nop              side 0b11
   jmp x-- ch3_      side 0b11
-
   nop           [1] side 0b00
-  nop               side 0b10
+  nop              side 0b10
   set x, 30         side 0b10
-
-  ; --- ch2 (LRCK=L, skip 32 bits) ---
 ch2_:
   nop           [1] side 0b00
-  nop               side 0b10
+  nop              side 0b10
   jmp x-- ch2_      side 0b10
-
   nop           [1] side 0b00
-  nop               side 0b10
+  nop              side 0b10
   set x, 30         side 0b10
-
-  ; --- ch4 (LRCK=L, capture 32 bits) ---
 ch4_:
   nop           [1] side 0b00
-  in  pins, 1       side 0b10
+    in  pins, 1    side 0b10
   jmp x-- ch4_      side 0b10
-
   nop           [1] side 0b01
-  in  pins, 1       side 0b11
-
+    in  pins, 1    side 0b11
 .wrap
-
-; -----------------------------------------------------------------------------
-; Master clock generator: 2 PIO cycles = 1 MCLK period (50% duty)
-; -----------------------------------------------------------------------------
 .program mic_mclk
-
 .wrap_target
-
-  ; ...........................................................................
-  ; set #0 ---> MCLK
-  ; ...........................................................................
-
-  ; ...
   set pins, 1
   set pins, 0
-
 .wrap

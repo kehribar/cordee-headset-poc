@@ -94,6 +94,14 @@ int32_t es7210_readReg(uint8_t reg, uint8_t* val);
 int32_t es7210_init();
 
 // ----------------------------------------------------------------------------
+// Variant of es7210_init that lets the caller pick which microphones to
+// enable. micMask is a 4-bit bitmask, bit n -> ES7210_MICn (n=0..3).
+// Selected mics get SELMIC + the supplied gain. Unselected mics have their
+// SELMIC bit cleared and gain code 0.
+// ----------------------------------------------------------------------------
+int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain);
+
+// ----------------------------------------------------------------------------
 // Runtime analog (PGA) gain per microphone.
 // ----------------------------------------------------------------------------
 int32_t es7210_setMicGain(es7210_mic_t mic, es7210_gain_t gain);

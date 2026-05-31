@@ -136,103 +136,116 @@ int32_t es7210_readChipId(uint8_t* id1, uint8_t* id0)
 }
 
 // ----------------------------------------------------------------------------
-int32_t es7210_init()
+int32_t es7210_init(void)
+{
+  // Default: all four mics SELMIC'd at max gain. The actual streaming slot
+  // is decided by the PIO capture position.
+  return es7210_initSel(0x0F, ES7210_GAIN_37P5DB);
+}
+
+int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain)
 {
   int32_t rc = ES7210_OK;
+
+  // ---- Phase 1: configuration (mirrors Espressif es7210_adc_init) ----
 
   // Soft reset all registers
   rc |= es7210_writeReg(ES7210_REG_RESET, 0xFF);
   sleep_ms(10);
 
-  // Exit reset: CSM_ON=1, SEQ_DIS=0 (auto power sequence enabled)
-  rc |= es7210_writeReg(ES7210_REG_RESET, 0x32);
+  // Bring the chip out of reset.
+  rc |= es7210_writeReg(ES7210_REG_RESET, 0x41);
 
-  // Enable all clocks (turn off the master-mode SCLK/LRCK drivers since we
-  // are I2S slave, but keep MCLK + ADC clocks running).
-  // bit5 MASTER_CLK_OFF=1, bit6 EXT_SCLKLRCK_OFF=0 (slave SCLK/LRCK enabled)
-  rc |= es7210_writeReg(ES7210_REG_CLK_OFF, 0x20);
+  // Disable all internal clock paths, then re-enable the ones we need.
+  // Espressif starts with 0x3F (everything off) and clears bits per
+  // selected mic channel further down.
+  rc |= es7210_writeReg(ES7210_REG_CLK_OFF, 0x3F);
 
-  // Main clock control: ADC clock multiplier x2, ADC divider /1
-  // Suited to MCLK = 256*Fs configuration.
-  rc |= es7210_writeReg(ES7210_REG_MAINCLK, 0xC1);
-
-  // Master clock control: MCLK from pad, SCLK divide /4 (unused in slave)
-  rc |= es7210_writeReg(ES7210_REG_MASTERCLK, 0x04);
-
-  // Master LRCK divider (unused in slave mode, leave as default 256)
-  rc |= es7210_writeReg(ES7210_REG_MLRCK_DIVH, 0x01);
-  rc |= es7210_writeReg(ES7210_REG_MLRCK_DIVL, 0x00);
-
-  // Power: DLL on, internal pull-ups on, TDMIN pulldown on
-  rc |= es7210_writeReg(ES7210_REG_PWRDN, 0x00);
-
-  // ADC OSR (default 0x20 = 32)
-  rc |= es7210_writeReg(ES7210_REG_ADC_OSR, 0x20);
-
-  // Mode: SCLK normal, EQ off, single-speed (Fs<=48kHz), I2S slave.
-  // LRCK_RATE_MODE = 2 (4 channels, used by some TDM variants).
-  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x24);
-
-  // Initialization timing
+  // Initialisation timing.
   rc |= es7210_writeReg(ES7210_REG_TIME_CTRL0, 0x30);
   rc |= es7210_writeReg(ES7210_REG_TIME_CTRL1, 0x30);
 
-  // Misc control (default DELAY_SEL=01 / 5ns)
-  rc |= es7210_writeReg(ES7210_REG_MISC, 0x01);
+  // HPF cutoff defaults (Espressif "quick setup" values).
+  rc |= es7210_writeReg(ES7210_REG_ADC12_HPF2, 0x2A);
+  rc |= es7210_writeReg(ES7210_REG_ADC12_HPF1, 0x0A);
+  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF2, 0x0A);
+  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF1, 0x2A);
 
-  // DMIC off (analog mic mode)
-  rc |= es7210_writeReg(ES7210_REG_DMIC_CTRL, 0x00);
+  // MODE_CFG: bit 0 = master/slave. 0 = slave (we feed BCLK/LRCK).
+  rc |= es7210_writeReg(ES7210_REG_MODE_CFG, 0x00);
 
-  // SDP: 32-bit word length (SP_WL=100), I2S protocol (SP_PROTOCAL=00)
-  rc |= es7210_writeReg(ES7210_REG_SDP_CFG1, 0x80);
-
-  // SDP: TDM I2S on SDOUT1 (SDOUT_MODE=10).
-  // Frame: ch1, ch3 during LRCK=H, ch2, ch4 during LRCK=L (Figure 2e).
-  rc |= es7210_writeReg(ES7210_REG_SDP_CFG2, 0x02);
-
-  // ALC disabled, plain PGA gain mode
-  rc |= es7210_writeReg(ES7210_REG_ALC_SEL, 0x00);
-
-  // HPF defaults (DC blocker on, slow setting). ADC34 mirrors ADC12.
-  rc |= es7210_writeReg(ES7210_REG_ADC12_HPF1, 0x06);
-  rc |= es7210_writeReg(ES7210_REG_ADC12_HPF2, 0x26);
-  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF1, 0x06);
-  rc |= es7210_writeReg(ES7210_REG_ADC34_HPF2, 0x26);
-
-  // Analog: PDN_ANA off (bit7=0), VX2OFF=1 for VDDA=3.3V (bit6=1)
+  // Analog block: PDN_ANA off, VDDA = 3.3 V, VMID 5 kOhm start.
   rc |= es7210_writeReg(ES7210_REG_ANALOG, 0x43);
 
-  // Mic bias: 2.87V on MIC3/4 pair (only MIC4 used). MIC1/2 pair off.
+  // Mic bias: 2.87 V on both pairs (only MIC4 is populated here).
   rc |= es7210_writeReg(ES7210_REG_MIC12_BIAS, 0x70);
   rc |= es7210_writeReg(ES7210_REG_MIC34_BIAS, 0x70);
 
-  // Only MIC4 selected at 0 dB; MIC1/2/3 deselected.
+  // ADC OSR.
+  rc |= es7210_writeReg(ES7210_REG_ADC_OSR, 0x20);
+
+  // Main clock: MCLK = 256 * Fs (Fs = 48 kHz, MCLK = 12.288 MHz).
+  // adc_div=1 (bits 3:0), doubler=1 (bit 6), dll=1 (bit 7) -> 0xC1.
+  rc |= es7210_writeReg(ES7210_REG_MAINCLK, 0xC1);
+
+  // LRCK divider used in master mode only (we run slave).
+  rc |= es7210_writeReg(ES7210_REG_MLRCK_DIVH, 0x01);
+  rc |= es7210_writeReg(ES7210_REG_MLRCK_DIVL, 0x00);
+
+  // SDP: 32-bit slot width, Left-Justified protocol (no 1-BCLK delay after
+  // LRCK transition). Our PIO does not implement the I2S 1-BCLK delay,
+  // so LJ aligns the chip's data with our slot capture timing.
+  rc |= es7210_writeReg(ES7210_REG_SDP_CFG1, 0x81);
+
+  // SDP: TDM I2S on SDOUT1 (4 channels in one LRCK period).
+  rc |= es7210_writeReg(ES7210_REG_SDP_CFG2, 0x02);
+
+  // ALC disabled.
+  rc |= es7210_writeReg(ES7210_REG_ALC_SEL, 0x00);
+
+  // ---- Mic select + start (mirrors Espressif's two-phase activation) ----
+
+  // Park both pairs as fully powered down.
+  rc |= es7210_writeReg(ES7210_REG_MIC12_PDN, 0xFF);
+  rc |= es7210_writeReg(ES7210_REG_MIC34_PDN, 0xFF);
+
+  // Clear SELMIC + gain on every channel first.
   rc |= es7210_writeReg(ES7210_REG_MIC1_GAIN, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC2_GAIN, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC3_GAIN, 0x00);
-  rc |= es7210_writeReg(ES7210_REG_MIC4_GAIN, ES7210_GAIN_SELMIC | ES7210_GAIN_33DB);
+  rc |= es7210_writeReg(ES7210_REG_MIC4_GAIN, 0x00);
 
-  // Low-power bits off on all mics
+  // Re-enable internal clocks for ALL four ADC channels (Espressif clears
+  // bits 0x1F from CLK_OFF when MIC1..MIC4 are all selected).
+  rc |= es7210_writeReg(ES7210_REG_CLK_OFF, 0x20);
+
+  // Power up BOTH ADC pairs (Espressif writes 0x00 to power up a pair).
+  rc |= es7210_writeReg(ES7210_REG_MIC12_PDN, 0x00);
+  rc |= es7210_writeReg(ES7210_REG_MIC34_PDN, 0x00);
+
+  // SELMIC + gain per supplied mask.
+  for(uint32_t i = 0; i < 4; i++)
+  {
+    const uint8_t gainCode = (uint8_t)(gain & ES7210_GAIN_CODE_MASK);
+    const uint8_t val = (micMask & (1u << i)) ? (ES7210_GAIN_SELMIC | gainCode) : 0x00;
+    rc |= es7210_writeReg(kGainRegForMic[i], val);
+  }
+
+  // ---- Phase 2: start (mirrors Espressif es7210_start) ----
+
+  rc |= es7210_writeReg(ES7210_REG_CLK_OFF, 0x20);
+  rc |= es7210_writeReg(ES7210_REG_PWRDN, 0x00);
+  rc |= es7210_writeReg(ES7210_REG_ANALOG, 0x43);
+
+  // MICx_LP: 0x00 = normal mode (datasheet default). Espressif's "0x08"
+  // sets bit 3 = LP_PGAn = LOW POWER mode, which silently caps the PGA
+  // gain — that was why our PGA gain changes never moved the noise floor.
   rc |= es7210_writeReg(ES7210_REG_MIC1_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC2_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC3_LP, 0x00);
   rc |= es7210_writeReg(ES7210_REG_MIC4_LP, 0x00);
 
-  // Power down ADC1/ADC2 entirely; MIC1/2 pair off.
-  rc |= es7210_writeReg(ES7210_REG_MIC12_PDN, 0xFF);
-
-  // ADC34 pair: ref-gen + MICBIAS34 + ADC4 + PGA4 ON; ADC3/PGA3 OFF.
-  // bits: PDN_ADC34VREFGEN=0, PDN_MICBIAS34=0, PDN_PGA4=0, PDN_PGA3=1,
-  //       PDN_MOD4=0, PDN_MOD3=1, MODTOP4_RST=0, MODTOP3_RST=1  -> 0x15
-  rc |= es7210_writeReg(ES7210_REG_MIC34_PDN, 0x15);
-
-  // Release all digital resets and turn the chip state machine ON.
-  // Without this, ADC modulators stay off and SDOUT1 outputs digital zero.
-  // bits: RST_MSTGEN=0, RST_ADC34_DIG=0, RST_ADC12_DIG=0, SEQ_DIS=0,
-  //       RST_REGS=0, RST_DIG=0, CSM_ON=1  -> 0x01
-  rc |= es7210_writeReg(ES7210_REG_RESET, 0x01);
-
-  // Give the auto power-up sequence time to walk through chip-initial -> normal
+  // Give the auto power-up sequence time to walk to normal state.
   sleep_ms(50);
 
   // Probe chip ID for sanity
@@ -252,24 +265,6 @@ int32_t es7210_init()
   {
     return ES7210_FAIL;
   }
-
-  // Read back the critical registers so we can verify the writes took.
-  uint8_t mic4_gain = 0;
-  uint8_t mic34_pdn = 0;
-  uint8_t mic34_bias = 0;
-  uint8_t analog = 0;
-  uint8_t sdp_cfg1 = 0;
-  uint8_t sdp_cfg2 = 0;
-  es7210_readReg(ES7210_REG_MIC4_GAIN, &mic4_gain);
-  es7210_readReg(ES7210_REG_MIC34_PDN, &mic34_pdn);
-  es7210_readReg(ES7210_REG_MIC34_BIAS, &mic34_bias);
-  es7210_readReg(ES7210_REG_ANALOG, &analog);
-  es7210_readReg(ES7210_REG_SDP_CFG1, &sdp_cfg1);
-  es7210_readReg(ES7210_REG_SDP_CFG2, &sdp_cfg2);
-  xprintf("[es7210] MIC4_GAIN=%02X MIC34_PDN=%02X MIC34_BIAS=%02X\r\n",
-    mic4_gain, mic34_pdn, mic34_bias);
-  xprintf("[es7210] ANALOG=%02X SDP_CFG1=%02X SDP_CFG2=%02X\r\n",
-    analog, sdp_cfg1, sdp_cfg2);
 
   return ES7210_OK;
 }
