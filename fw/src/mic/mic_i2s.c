@@ -7,6 +7,7 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "hardware/clocks.h"
+#include "hardware/gpio.h"
 #include "xprintf.h"
 
 // ----------------------------------------------------------------------------
@@ -35,6 +36,16 @@ static void mic_i2s_pio_init(
     pio_gpio_init(pio, sdout_pin);
     pio_gpio_init(pio, lrck_pin);
     pio_gpio_init(pio, bclk_pin);
+
+    // MITIGATION: the Fs/16 mic comb is LRCK/BCLK digital-edge coupling into
+    // the analog front-end. Lowest drive (2 mA) + slow slew on these clock
+    // pins cuts the comb carriers by ~5 dB (measured). SDOUT is an input;
+    // MCLK is a separate domain proven not to drive the comb, both untouched.
+    // See src/mic/notes.md "MIC NOISE INVESTIGATION".
+    gpio_set_drive_strength(lrck_pin, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(bclk_pin, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_slew_rate(lrck_pin, GPIO_SLEW_RATE_SLOW);
+    gpio_set_slew_rate(bclk_pin, GPIO_SLEW_RATE_SLOW);
 
     // ...
     const uint32_t pmask_out = ((1u << lrck_pin) | (1u << bclk_pin));

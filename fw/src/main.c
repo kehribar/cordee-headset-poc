@@ -189,9 +189,8 @@ static void hardware_init()
   i2c_init();
   i2c_scan();
 
-  // Only MIC4 is populated. Moderate analog gain (33 dB) — high enough for
-  // good SNR without saturating on loud sources.
-  es7210_initSel(0x08, ES7210_GAIN_33DB);
+  // Only MIC4 is populated. Max analog gain (37.5 dB).
+  es7210_initSel(0x08, ES7210_GAIN_37P5DB);
 
   // ...
   tud_init(BOARD_TUD_RHPORT);

@@ -36,7 +36,7 @@ enum {
 // ----------------------------------------------------------------------------
 // Audio format parameters
 // ----------------------------------------------------------------------------
-#define AUDIO_SAMPLE_RATE  48000
+#define AUDIO_SAMPLE_RATE  48000   // keep == FS in main.c
 #define AUDIO_SPK_CH       1
 #define AUDIO_SPK_BYTES    2
 #define AUDIO_SPK_BITS     16
@@ -44,9 +44,11 @@ enum {
 #define AUDIO_MIC_BYTES    3
 #define AUDIO_MIC_BITS     24
 
-// Hardcoded for Full Speed: ((48000 + 999) / 1000 + 1) = 49 samples/frame
-#define AUDIO_EP_SPK_SZ    (49 * AUDIO_SPK_BYTES * AUDIO_SPK_CH)  // 98
-#define AUDIO_EP_MIC_SZ    (49 * AUDIO_MIC_BYTES * AUDIO_MIC_CH)  // 147
+// Full-speed (1 ms frame) max samples/frame, +1 for async clock drift.
+//   48k -> 49,  60k -> 61
+#define AUDIO_MAX_SPF      (((AUDIO_SAMPLE_RATE) + 999) / 1000 + 1)
+#define AUDIO_EP_SPK_SZ    (AUDIO_MAX_SPF * AUDIO_SPK_BYTES * AUDIO_SPK_CH)  // 60k:122
+#define AUDIO_EP_MIC_SZ    (AUDIO_MAX_SPF * AUDIO_MIC_BYTES * AUDIO_MIC_CH)  // 60k:183
 
 // ----------------------------------------------------------------------------
 // AC class-specific block length (entities only, excludes CS_AC header)

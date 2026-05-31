@@ -184,8 +184,8 @@ int32_t es7210_initSel(uint8_t micMask, es7210_gain_t gain)
   // ADC OSR.
   rc |= es7210_writeReg(ES7210_REG_ADC_OSR, 0x20);
 
-  // Main clock: MCLK = 256 * Fs (Fs = 48 kHz, MCLK = 12.288 MHz).
-  // adc_div=1 (bits 3:0), doubler=1 (bit 6), dll=1 (bit 7) -> 0xC1.
+  // Main clock: MCLK = 256 * Fs. 256x ratio -> adc_div=1, doubler=1, dll=1
+  // -> 0xC1 (valid for any Fs, since it is a ratio-based config).
   rc |= es7210_writeReg(ES7210_REG_MAINCLK, 0xC1);
 
   // LRCK divider used in master mode only (we run slave).

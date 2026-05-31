@@ -7,6 +7,7 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "hardware/clocks.h"
+#include "hardware/gpio.h"
 #include "xprintf.h"
 
 // ----------------------------------------------------------------------------
@@ -37,6 +38,16 @@ static void dac_i2s_pio_init(
     pio_gpio_init(pio, dout_pin);
     pio_gpio_init(pio, bclk_pin);
     pio_gpio_init(pio, lrck_pin);
+
+    // Lowest drive (2 mA, the RP2350 pad floor) + slow slew on the DAC I2S
+    // pins. General EMI hygiene; the short on-board trace to the DAC needs
+    // no more. (Did not measurably move the mic Fs/16 comb, but harmless.)
+    gpio_set_drive_strength(dout_pin, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(bclk_pin, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(lrck_pin, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_slew_rate(dout_pin, GPIO_SLEW_RATE_SLOW);
+    gpio_set_slew_rate(bclk_pin, GPIO_SLEW_RATE_SLOW);
+    gpio_set_slew_rate(lrck_pin, GPIO_SLEW_RATE_SLOW);
 
     // ...
     const uint32_t pmask_out = (

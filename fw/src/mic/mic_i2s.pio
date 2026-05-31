@@ -1,35 +1,60 @@
+; ----------------------------------------------------------------------------
+; mic_i2s: I2S/TDM master. The RP2350 drives LRCK + BCLK and samples SDOUT;
+; the ES7210 runs as slave. One LRCK period = a 4-slot TDM frame, 32 bits per
+; slot (BCLK = 128*Fs). Only the 4th slot (ch4 = MIC4) is captured.
+;
+; side_set is 2 bits, base = LRCK pin:  bit0 = LRCK, bit1 = BCLK
+;   side 0b11 -> LRCK=1 BCLK=1   side 0b01 -> LRCK=1 BCLK=0
+;   side 0b10 -> LRCK=0 BCLK=1   side 0b00 -> LRCK=0 BCLK=0
+; PIO clock is 512*Fs -> 4 PIO cycles per BCLK bit (2 low, 2 high). The [1]
+; delay stretches the BCLK-low phase to 2 cycles; SDOUT is sampled while
+; BCLK is high (rising-edge capture). LRCK is high for slots 1&3 (first half
+; of the frame) and low for slots 2&4 (second half).
+; ----------------------------------------------------------------------------
 .program mic_i2s
 .side_set 2
 .wrap_target
-  set x, 30         side 0b11
+  ; --- slot 1 (ch1): LRCK high, 32 bits clocked out, data ignored ---
+  set x, 30        side 0b11   ; load bit counter (31 loop + 1 trailing = 32)
 ch1_:
-  nop           [1] side 0b01
-  nop              side 0b11
-  jmp x-- ch1_      side 0b11
-  nop           [1] side 0b01
-  nop              side 0b11
-  set x, 30         side 0b11
+  nop          [1] side 0b01   ; BCLK low  (2 cyc)
+  nop              side 0b11   ; BCLK high (1 cyc)
+  jmp x-- ch1_     side 0b11   ; next bit; BCLK held high through the jump
+  nop          [1] side 0b01   ; 32nd bit: BCLK low
+  nop              side 0b11   ; 32nd bit: BCLK high
+
+  ; --- slot 2 (ch3): LRCK still high, data ignored ---
+  set x, 30        side 0b11
 ch3_:
-  nop           [1] side 0b01
+  nop          [1] side 0b01
   nop              side 0b11
-  jmp x-- ch3_      side 0b11
-  nop           [1] side 0b00
+  jmp x-- ch3_     side 0b11
+  nop          [1] side 0b00   ; last bit of LRCK-high half: drop LRCK low
   nop              side 0b10
-  set x, 30         side 0b10
+
+  ; --- slot 3 (ch2): LRCK low, data ignored ---
+  set x, 30        side 0b10
 ch2_:
-  nop           [1] side 0b00
+  nop          [1] side 0b00
   nop              side 0b10
-  jmp x-- ch2_      side 0b10
-  nop           [1] side 0b00
+  jmp x-- ch2_     side 0b10
+  nop          [1] side 0b00
   nop              side 0b10
-  set x, 30         side 0b10
+
+  ; --- slot 4 (ch4 = MIC4): LRCK low, this is the one we capture ---
+  set x, 30        side 0b10
 ch4_:
-  nop           [1] side 0b00
-    in  pins, 1    side 0b10
-  jmp x-- ch4_      side 0b10
-  nop           [1] side 0b01
-    in  pins, 1    side 0b11
+  nop          [1] side 0b00   ; BCLK low
+  in pins, 1       side 0b10   ; BCLK high -> sample SDOUT bit
+  jmp x-- ch4_     side 0b10
+  nop          [1] side 0b01   ; 32nd bit: BCLK low, raise LRCK for next frame
+  in pins, 1       side 0b11   ; BCLK high -> sample final bit (autopush @ 32)
 .wrap
+
+; ----------------------------------------------------------------------------
+; mic_mclk: free-running MCLK square wave for the ES7210 (= 256*Fs). One high
+; + one low instruction per loop; the SM clock divider sets the frequency.
+; ----------------------------------------------------------------------------
 .program mic_mclk
 .wrap_target
   set pins, 1
