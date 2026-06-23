@@ -160,9 +160,15 @@ static void hardware_init()
       fs_Hz  // Sampling frequency in Hertz
   );
 
-  // Speaker enable
+  // Speaker enable (NS4168). dac_i2s_init() above already has the PIO clocking
+  // silence (m_txBuf is zero-initialized), so keep the amp shut down until
+  // BCLK/LRCK have settled, then bring it up while it is receiving silence.
+  // This lets the NS4168 pop-suppression do its job and avoids the class-D
+  // power-on pop.
   gpio_init(29);
   gpio_set_dir(29, GPIO_OUT);
+  gpio_put(29, false);
+  sleep_ms(50);
   gpio_put(29, true);
 
   // ...

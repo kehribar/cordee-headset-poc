@@ -80,8 +80,8 @@ static void __not_in_flash_func(dma_handler)()
 {
   if(dma_hw->ints0 & (1u << m_dma_chan_output))
   {
-    // Clear IRQ flag
-    hw_set_bits(&dma_hw->ints1, (1u << m_dma_chan_output));
+    // Clear IRQ flag (this handler is on DMA_IRQ_0 -> ints0, not ints1)
+    hw_set_bits(&dma_hw->ints0, (1u << m_dma_chan_output));
 
     // Swap A/B buffer
     m_txBuf_part ^= 0x01;
